@@ -85,6 +85,60 @@
 
 概率模型在获得与确定性模型相当甚至更优的点预测性能的同时，还提供了校准良好的不确定性估计（95% 置信区间实际覆盖率为 93%）。
 
+### 可视化结果
+
+#### 传感器退化趋势图
+
+![传感器退化趋势](results/figures/sensor_degradation.png)
+
+展示 4 台发动机的关键传感器（s2, s3, s4, s11）随运行周期的变化。传感器读数在发动机寿命末期出现明显上升/偏移趋势，这是模型学习的核心退化信号。不同发动机寿命差异较大（约 150~300 周期）。
+
+#### 训练曲线
+
+| 概率 LSTM | 确定性 LSTM |
+|:---------:|:----------:|
+| ![概率 LSTM 训练曲线](results/figures/training_curves_prob.png) | ![确定性 LSTM 训练曲线](results/figures/training_curves_det.png) |
+
+概率 LSTM 使用 Gaussian NLL 损失，初始 loss 较高后迅速收敛至 ~2.7，epoch 56 早停；确定性 LSTM 使用 MSE 损失，从 ~4300 下降至 ~140，epoch 44 早停。两者训练/验证曲线贴合良好，无明显过拟合。
+
+#### RUL 预测 vs 真实值散点图
+
+| 概率 LSTM | 确定性 LSTM |
+|:---------:|:----------:|
+| ![概率 LSTM 散点图](results/figures/rul_scatter_prob.png) | ![确定性 LSTM 散点图](results/figures/rul_scatter_det.png) |
+
+每个点代表一台测试发动机。红色虚线为完美预测。低 RUL 区域（<40）预测准确，紧贴对角线；高 RUL 区域（>80）散布较大且趋向 R_early=125 上限，这是分段线性标签在高 RUL 区信息不足的固有特征。
+
+#### 带不确定性的预测图
+
+![带不确定性的预测](results/figures/predictions_uncertainty.png)
+
+样本按真实 RUL 排序。蓝线为预测均值，蓝色阴影为 95% 置信区间（±2σ）。低 RUL 处置信区间窄（模型有信心），高 RUL 处置信区间宽（模型不确定）。绝大多数真实值（黑点）落在阴影内，验证了 PICP=93% 的覆盖率。
+
+#### 不确定性分解图
+
+![不确定性分解](results/figures/uncertainty_decomposition.png)
+
+将总不确定性拆分为两部分：橙色带为**偶然不确定性**（数据噪声，均值 12.33），绿色带为**认知不确定性**（模型不确定性，均值 4.38）。偶然不确定性占主导，说明数据本身的噪声是预测不确定性的主要来源，模型结构已足够捕获退化模式。
+
+#### 校准曲线
+
+![校准曲线](results/figures/calibration.png)
+
+X 轴为期望覆盖率，Y 轴为实际覆盖率。蓝线紧贴红色对角线，表明模型的不确定性估计是"诚实的"——预测的置信区间宽度与实际覆盖率吻合良好。
+
+#### 稀疏化图
+
+![稀疏化图](results/figures/sparsification.png)
+
+逐步移除模型认为最不确定的样本后，观察剩余样本的 RMSE。蓝线（模型不确定性）随移除比例增加而下降，且趋势与红线（Oracle，按实际误差排序）一致，说明模型的不确定性估计与实际预测误差正相关——高不确定性确实对应高误差。
+
+#### 消融对比
+
+![消融对比](results/figures/ablation_det_vs_prob.png)
+
+确定性 LSTM 与概率 LSTM 的 RMSE 和 MAE 对比。两者非常接近（概率模型略优），说明概率模型在不牺牲点预测精度的前提下，额外获得了不确定性量化能力。
+
 ## 使用方法
 
 ```bash
@@ -202,6 +256,60 @@ The dataset is automatically downloaded from NASA Open Data Portal when running 
 | Mean Total Std | 13.17 |
 
 The probabilistic model achieves competitive point prediction performance while providing calibrated uncertainty estimates (93% coverage for 95% confidence intervals).
+
+### Visualization
+
+#### Sensor Degradation Trends
+
+![Sensor Degradation](results/figures/sensor_degradation.png)
+
+Shows 4 key sensors (s2, s3, s4, s11) across 4 engines over their operating cycles. Sensor readings exhibit clear upward drift near end-of-life, which is the core degradation signal the model learns from. Engine lifespans vary significantly (~150–300 cycles).
+
+#### Training Curves
+
+| Probabilistic LSTM | Deterministic LSTM |
+|:-------------------:|:------------------:|
+| ![Prob Training](results/figures/training_curves_prob.png) | ![Det Training](results/figures/training_curves_det.png) |
+
+The probabilistic LSTM (Gaussian NLL loss) converges quickly from ~46 to ~2.7, early-stopped at epoch 56. The deterministic LSTM (MSE loss) drops from ~4300 to ~140, early-stopped at epoch 44. Both show well-matched train/val curves with no significant overfitting.
+
+#### RUL Prediction vs Ground Truth
+
+| Probabilistic LSTM | Deterministic LSTM |
+|:-------------------:|:------------------:|
+| ![Prob Scatter](results/figures/rul_scatter_prob.png) | ![Det Scatter](results/figures/rul_scatter_det.png) |
+
+Each point represents one test engine. The red dashed line indicates perfect prediction. Low RUL predictions (<40) are accurate and tightly clustered around the diagonal. High RUL predictions (>80) show more scatter and tend toward the R_early=125 cap — a known artifact of the piece-wise linear labeling scheme.
+
+#### Predictions with Uncertainty Bands
+
+![Predictions with Uncertainty](results/figures/predictions_uncertainty.png)
+
+Samples sorted by true RUL. Blue line is the predicted mean; blue shaded region is the 95% confidence interval (±2σ). Confidence intervals are narrow for low RUL (high model confidence) and wide for high RUL (high uncertainty). Most ground truth values (black dots) fall within the shaded band, consistent with the 93% PICP.
+
+#### Uncertainty Decomposition
+
+![Uncertainty Decomposition](results/figures/uncertainty_decomposition.png)
+
+Total uncertainty decomposed into: orange band = **aleatoric** (data noise, mean std 12.33) and green band = **epistemic** (model uncertainty, mean std 4.38). Aleatoric uncertainty dominates, indicating that inherent data noise is the primary source of prediction uncertainty, while the model architecture sufficiently captures degradation patterns.
+
+#### Calibration Plot
+
+![Calibration](results/figures/calibration.png)
+
+Expected coverage (x-axis) vs actual coverage (y-axis). The blue curve closely follows the red diagonal (perfect calibration), demonstrating that the model's uncertainty estimates are well-calibrated — predicted confidence intervals match their intended coverage levels.
+
+#### Sparsification Plot
+
+![Sparsification](results/figures/sparsification.png)
+
+RMSE computed on remaining samples after progressively removing the most uncertain predictions. The blue curve (model uncertainty) decreases consistently and follows the same trend as the red curve (oracle, sorted by actual error), confirming that higher predicted uncertainty correlates with larger actual prediction errors.
+
+#### Ablation Comparison
+
+![Ablation](results/figures/ablation_det_vs_prob.png)
+
+Side-by-side RMSE and MAE comparison between deterministic and probabilistic LSTM. Both metrics are nearly identical (probabilistic slightly better), demonstrating that the probabilistic model provides uncertainty quantification without sacrificing point prediction accuracy.
 
 ## Usage
 
