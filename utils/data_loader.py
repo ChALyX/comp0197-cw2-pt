@@ -149,22 +149,37 @@ def add_rul_labels(df, r_early=125):
     return df
 
 
-def select_features(train_df, threshold=0.01):
-    """Select features by removing near-constant columns.
+def select_features(train_df, std_threshold=0.01, corr_threshold=0.1):
+    """Select features using data-driven two-stage filtering.
+
+    Stage 1: Remove near-constant features (std < std_threshold).
+    Stage 2: Keep features with |Spearman correlation with RUL| > corr_threshold.
+
+    Requires 'RUL' column to exist in train_df (call add_rul_labels first).
 
     Args:
-        train_df: Training DataFrame.
-        threshold: Minimum standard deviation to keep a feature.
+        train_df: Training DataFrame with RUL column.
+        std_threshold: Minimum standard deviation to pass variance filter.
+        corr_threshold: Minimum |Spearman correlation| with RUL to pass correlation filter.
 
     Returns:
         List of selected feature column names.
     """
-    # Only consider sensor and setting columns (exclude unit_id, cycle, RUL)
     feature_cols = [c for c in train_df.columns
                     if c.startswith('s') or c.startswith('setting_')]
+
+    # Stage 1: Variance filter
     stds = train_df[feature_cols].std()
-    selected = stds[stds > threshold].index.tolist()
-    print(f"Selected {len(selected)} features: {selected}")
+    variance_passed = stds[stds > std_threshold].index.tolist()
+
+    # Stage 2: Correlation filter (Spearman rank correlation with RUL)
+    correlations = train_df[variance_passed + ['RUL']].corr(method='spearman')['RUL'].drop('RUL')
+    selected = correlations[correlations.abs() > corr_threshold].index.tolist()
+
+    print(f"Feature selection: {len(feature_cols)} total -> "
+          f"{len(variance_passed)} (variance filter) -> "
+          f"{len(selected)} (correlation filter)")
+    print(f"Selected features: {selected}")
     return selected
 
 
